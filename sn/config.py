@@ -1,0 +1,5 @@
+HUNTER_IO_API_KEY = '05fcefc6047d34a869d1413877eebf693cdb989d'
+VALID_HUNTER_STATUSES = ['valid', 'accept_all', 'webmail']
+CLEARBIT_API_KEY = 'sk_b24db52882fa29e1ad3cdf419278ffc0'
+PRIVATE_KEY_RS_256 = 'jwtRS256.pem'
+PUBLIC_KEY_RS_256 = 'jwtRS256.pem.pub'
