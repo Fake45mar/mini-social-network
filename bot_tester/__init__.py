@@ -29,7 +29,7 @@ if __name__ == "__main__":
         ))
     # signup users
     list_json_signups = []
-    for user in list_users:
+    for sign, user in zip(range(0, config.SIGNUP_USERS, 1), list_users):
         signup = user.signup()
         list_json_signups.append(signup)
     logger.info('list of signup_json: {}'.format(list_json_signups))
@@ -43,7 +43,6 @@ if __name__ == "__main__":
         except AssertionError:
             pass
     # create posts
-    list_json_create_posts = []
     user_posts = {}
     for user in list_users:
         user_posts[user] = []
@@ -52,7 +51,7 @@ if __name__ == "__main__":
                                            user.name*2 + user.email*2 + user.company*2 +
                                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
             user_posts[user].append(create_post['data']['post'])
-    logger.info('list_json_create_posts: {}'.format(list_json_create_posts))
+    logger.info('user_posts: {}'.format(user_posts))
     posts = r.get('http://127.0.0.1:8000/')
     # likes
     list_json_like_dislike = []
