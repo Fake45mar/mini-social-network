@@ -32,7 +32,8 @@ async def get_clearbit_info_account(body_dict):
     clearbit.key = config.CLEARBIT_API_KEY
     clearbit_json = json.dumps({})
     try:
-        clearbit_request = clearbit.Enrichment.find(email=body_dict['email'], company=body_dict['company'])
+        clearbit_request = clearbit.Enrichment.find(email=body_dict['email'], company=body_dict['company'])  # may
+        # require payment, it leads to error
     except HTTPError:
         raise AssertionError
     if clearbit_request is not None:
