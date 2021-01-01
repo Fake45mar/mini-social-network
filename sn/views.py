@@ -1,6 +1,5 @@
-import requests as r
 import json
-import clearbit
+import asyncio
 import jwt
 import datetime
 from sn import config
@@ -8,6 +7,7 @@ from sn import models
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import ObjectDoesNotExist
+from django.core.exceptions import MultipleObjectsReturned
 from sn import functions
 
 
@@ -15,6 +15,7 @@ def index(request):
     def default(o):
         if isinstance(o, (datetime.date, datetime.datetime)):
             return o.isoformat()
+
     list_posts = list(models.Post.objects.all().values())
     return HttpResponse(json.dumps({'data': {'posts': list(list_posts)}}, sort_keys=True, indent=1, default=default))
 
@@ -26,16 +27,15 @@ def signup(request):
         title_body_dict = functions.get_dict_request(request)
         assert 'email' in title_body_dict.keys()
         assert 'company' in title_body_dict.keys()
-        hunter_io_verifier = r.get('https://api.hunter.io/v2/email-verifier?email={}&api_key={}'
-                                   .format(title_body_dict['email'], config.HUNTER_IO_API_KEY))
-        assert hunter_io_verifier.status_code == 200
-        hunter_io_verifier_json = hunter_io_verifier.json()
-        assert hunter_io_verifier_json['data']['status'] in config.VALID_HUNTER_STATUSES
-        clearbit.key = config.CLEARBIT_API_KEY
-        clearbit_json = json.dumps({})
-        clearbit_request = clearbit.Enrichment.find(email=title_body_dict['email'], company=title_body_dict['company'])
-        if clearbit_request is not None:
-            clearbit_json = json.dumps(clearbit_request)
+        try:
+            models.User.objects.get(user_name=title_body_dict['name'],
+                                    user_mail=title_body_dict['email'],
+                                    user_company=title_body_dict['company'],
+                                    user_password=title_body_dict['password'])
+            return HttpResponse(json.dumps({'data': {'error': 'User has already been registered'}}))
+        except ObjectDoesNotExist:
+            pass
+        hunter_io_verifier_json, clearbit_json = asyncio.run(functions.process_api_request(title_body_dict))
         models.User.objects.create(user_name=title_body_dict['name'],
                                    user_mail=title_body_dict['email'],
                                    user_company=title_body_dict['company'],
@@ -43,22 +43,24 @@ def signup(request):
                                    user_hunter_io=str(hunter_io_verifier_json),
                                    user_clearbit_com=str(clearbit_json),
                                    user_online=True)
-        user_dict = models.User.objects.get(user_name=title_body_dict['name'],
+        user = models.User.objects.get(user_name=title_body_dict['name'],
                                             user_mail=title_body_dict['email'],
                                             user_company=title_body_dict['company'],
                                             user_password=title_body_dict['password'],
                                             user_hunter_io=str(hunter_io_verifier_json),
                                             user_clearbit_com=str(clearbit_json),
-                                            user_online=True).__dict__
-        del user_dict['_state']
+                                            user_online=True)
         private_key = open(config.PRIVATE_KEY_RS_256, 'rb').read()
-        encoded_user_data = jwt.encode(user_dict, private_key, algorithm='RS256')
+        encoded_user_data = jwt.encode({'id': user.id, 'user_online': user.user_online}, private_key,
+                                       algorithm='RS256')
         return HttpResponse(json.dumps({'data': {'encoded_user_data': encoded_user_data}}))  # Does it return right key?
     except AssertionError:
         return HttpResponse(json.dumps({'data': {'error': 'Either mail, or some request data is wrong'}}))
     except ObjectDoesNotExist:
         return HttpResponse(json.dumps({'data': {'error': 'Either mail, or some request data is wrong or some '
                                                           'characters is not valid in your mail, name'}}))
+    except MultipleObjectsReturned:
+        return HttpResponse(json.dumps({'data': {'error': 'User with these data exists'}}))
 
 
 @csrf_exempt
@@ -73,12 +75,11 @@ def login(request):
         assert user.user_online is False
         user.user_online = True
         user.save()
-        user_dict = user.__dict__
-        del user_dict['_state']
         private_key = open(config.PRIVATE_KEY_RS_256, 'rb').read()
-        encoded_user_data = jwt.encode(user_dict, private_key, algorithm='RS256')
+        encoded_user_data = jwt.encode({'id': user.id, 'user_online': user.user_online},
+                                       private_key, algorithm='RS256')
         return HttpResponse(json.dumps({'data': {'encoded_user_data': encoded_user_data,
-                                                 'user': {'email': user_dict['user_mail']}, 'action': 'login'}}))
+                                                 'user': {'email': user.user_mail}, 'action': 'login'}}))
     except AssertionError:
         return HttpResponse(json.dumps({'data': {'error': 'User has already been authorized'}}))
     except ObjectDoesNotExist:
@@ -98,6 +99,13 @@ def create_post(request):
         assert 'id' in decoded_user_data.keys()
         assert 'title' in title_body_dict.keys()
         assert 'text' in title_body_dict.keys()
+        try:
+            models.Post.objects.get(post_user_id=decoded_user_data['id'],
+                                    post_title=title_body_dict['title'],
+                                    post_text=title_body_dict['text'])
+            return HttpResponse(json.dumps({'data': {'error': 'This post is already exists'}}))
+        except ObjectDoesNotExist:
+            pass
         models.Post.objects.create(post_likes=0,
                                    post_user_id=decoded_user_data['id'],
                                    post_title=title_body_dict['title'],
@@ -186,12 +194,11 @@ def logout(request):
         assert 'encoded_user_data' in title_body_dict.keys()
         public_key = open(config.PUBLIC_KEY_RS_256, 'rb').read()
         decoded_user_data = jwt.decode(title_body_dict['encoded_user_data'], public_key, algorithms='RS256')
-        user = models.User.objects.get(user_password=decoded_user_data['user_password'],
-                                       user_mail=decoded_user_data['user_mail'])
+        user = models.User.objects.get(id=decoded_user_data['id'])
         assert user.user_online is True
         user.user_online = False
         user.save()
-        return HttpResponse(json.dumps({'data': {'user': {'email': decoded_user_data['user_mail']}, 'action': 'logout',
+        return HttpResponse(json.dumps({'data': {'user': {'email': user.user_mail}, 'action': 'logout',
                                                  'success': True}}))
     except AssertionError:
         return HttpResponse(json.dumps({'data': {'error': 'User has already been authorized'}}))
