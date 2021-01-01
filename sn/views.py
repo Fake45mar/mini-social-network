@@ -142,7 +142,8 @@ def like(request):
         post.post_likes = post.post_likes + 1
         post.save()
         models.LikedPost.objects.create(liked_post_post_id=post.id, liked_post_user_id=decoded_user_data['id'])
-        return HttpResponse(json.dumps({'data': {'post': post.post_title, 'action': 'like', 'success': True}}))
+        return HttpResponse(json.dumps({'data': {'encoded_user_data': title_body_dict['encoded_user_data'],
+                                                 'post': post.post_title, 'action': 'like', 'success': True}}))
     except AssertionError:
         return HttpResponse(json.dumps({'data': {'error': 'It seems, that is your post, '
                                                           'you can\'t add like to your own post',
@@ -166,18 +167,19 @@ def dislike(request):
         post = models.Post.objects.get(post_title=title_body_dict['title'])
         assert decoded_user_data['id'] != post.post_user_id
         try:
-            models.LikedPost.objects.get(liked_post_post_id=post.id,
-                                         liked_post_user_id=decoded_user_data['id'])
-
-        except ObjectDoesNotExist:
+            models.DisLikedPost.objects.get(disliked_post_post_id=post.id,
+                                            disliked_post_user_id=decoded_user_data['id'])
             return HttpResponse(json.dumps({'data': {'error': 'It seems, that is post that you want to '
                                                               'like has already been disliked by you',
                                                      'success': False}}))
+        except ObjectDoesNotExist:
+            pass
         post.post_likes = post.post_likes - 1
         post.save()
-        models.LikedPost.objects.get(liked_post_post_id=post.id,
-                                     liked_post_user_id=decoded_user_data['id']).delete()
-        return HttpResponse(json.dumps({'data': {'post': post.post_title, 'action': 'dislike', 'success': True}}))
+        models.DisLikedPost.objects.create(disliked_post_post_id=post.id,
+                                           disliked_post_user_id=decoded_user_data['id']).delete()
+        return HttpResponse(json.dumps({'data': {'encoded_user_data': title_body_dict['encoded_user_data'],
+                                                 'post': post.post_title, 'action': 'dislike', 'success': True}}))
     except AssertionError:
         return HttpResponse(json.dumps({'data': {'error': 'It seems, that is your post, '
                                                           'you can\'t add dislike to your own post',
@@ -200,17 +202,11 @@ def logout(request):
         assert user.user_online is True
         user.user_online = False
         user.save()
-        # return HttpResponse(json.dumps({'data': {'user': {'email': user.user_mail}, 'action': 'logout',
-        #                                          'success': True}}))
         return HttpResponse(json.dumps({'data': {'encoded_user_data': title_body_dict['encoded_user_data'],
                                                  'user': {'email': user.user_mail}, 'action': 'logout',
                                                  'success': True}}))
     except AssertionError:
-        return HttpResponse(json.dumps({'data': {'error': 'User has already been authorized'}}))
+        return HttpResponse(json.dumps({'data': {'error': 'User has already been unauthorized'}}))
     except ObjectDoesNotExist:
         return HttpResponse(
             json.dumps({'data': {'error': 'User hasn\'t been found'}}))
-
-# TODO What does django.model.objects.get return if there aren't any objects that is matches!!!
-# TODO Check everything again before writes bot
-# TODO Check rules in test task
