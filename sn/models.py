@@ -30,5 +30,10 @@ class LikedPost(models.Model):
     liked_post_user = models.ForeignKey(User, on_delete=models.CASCADE)
     liked_post_post = models.ForeignKey(Post, on_delete=models.CASCADE)
 
-# class User():
-#     pass
+
+class DisLikedPost(models.Model):
+    class Meta:
+        db_table = "disliked_post"
+    disliked_post_user = models.ForeignKey(User, on_delete=models.CASCADE)
+    disliked_post_post = models.ForeignKey(Post, on_delete=models.CASCADE)
+
