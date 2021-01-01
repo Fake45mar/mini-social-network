@@ -8,8 +8,10 @@ class GetRequest(AbstractTestApi):
 
     def right_event(self, data):
         request = r.get(self._url, data=data)
-        assert 'encoded_user_data' in request.json().keys()
+        assert 'encoded_user_data' in request.json()['data'].keys()
+        return request.json()
 
     def wrong_event(self, data):
         request = r.get(self._url, data=data)
-        assert 'Error' in request.json().keys()
+        assert 'error' in request.json()['data'].keys()
+        return request.json()

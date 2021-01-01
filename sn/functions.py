@@ -4,6 +4,7 @@ import json
 import clearbit
 from sn import config
 from django.http import HttpResponse
+from requests.exceptions import HTTPError
 
 
 def get_dict_request(request):
@@ -30,7 +31,10 @@ async def get_hunter_verification(body_dict):
 async def get_clearbit_info_account(body_dict):
     clearbit.key = config.CLEARBIT_API_KEY
     clearbit_json = json.dumps({})
-    clearbit_request = clearbit.Enrichment.find(email=body_dict['email'], company=body_dict['company'])
+    try:
+        clearbit_request = clearbit.Enrichment.find(email=body_dict['email'], company=body_dict['company'])
+    except HTTPError:
+        raise AssertionError
     if clearbit_request is not None:
         clearbit_json = json.dumps(clearbit_request)
     return clearbit_json

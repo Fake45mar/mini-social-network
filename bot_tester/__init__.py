@@ -8,6 +8,8 @@ logger.basicConfig(filename='bot.log', level=logger.INFO)
 seed(1)
 
 if __name__ == "__main__":
+    assert len(config.FIRST_NAMES) > config.SIGNUP_USERS
+    assert len(config.LAST_NAMES) > config.SIGNUP_USERS
     list_users = []
     # initialize users
     for i in range(0, config.NUMBER_OF_USERS, 1):

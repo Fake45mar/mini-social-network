@@ -9,6 +9,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db.models import ObjectDoesNotExist
 from django.core.exceptions import MultipleObjectsReturned
 from sn import functions
+from jwt.exceptions import DecodeError
 
 
 def index(request):
@@ -111,7 +112,8 @@ def create_post(request):
                                    post_title=title_body_dict['title'],
                                    post_text=title_body_dict['text'],
                                    post_date=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        return HttpResponse(json.dumps({'data': {'post': title_body_dict['title'], 'success': True}}))
+        return HttpResponse(json.dumps({'data': {'encoded_user_data': title_body_dict['encoded_user_data'],
+                                                 'post': title_body_dict['title'], 'success': True}}))
     except AssertionError:
         return HttpResponse(json.dumps({'data': {'error': 'Please, pay attention to post details'}}))
 
@@ -198,7 +200,10 @@ def logout(request):
         assert user.user_online is True
         user.user_online = False
         user.save()
-        return HttpResponse(json.dumps({'data': {'user': {'email': user.user_mail}, 'action': 'logout',
+        # return HttpResponse(json.dumps({'data': {'user': {'email': user.user_mail}, 'action': 'logout',
+        #                                          'success': True}}))
+        return HttpResponse(json.dumps({'data': {'encoded_user_data': title_body_dict['encoded_user_data'],
+                                                 'user': {'email': user.user_mail}, 'action': 'logout',
                                                  'success': True}}))
     except AssertionError:
         return HttpResponse(json.dumps({'data': {'error': 'User has already been authorized'}}))
