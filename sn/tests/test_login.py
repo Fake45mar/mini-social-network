@@ -3,9 +3,9 @@ import logging as logger
 from sn.tests.test_get import GetRequest
 from sn.tests.test_post import PostRequest
 from sn.tests import config
-from random import randint
+from random import randint, shuffle
 
-logger.basicConfig(level=logger.INFO, filename='./login.log')
+logger.basicConfig(level=logger.INFO, filename='log/login.log')
 
 
 def main():
@@ -14,6 +14,8 @@ def main():
     post_request = PostRequest(config.requests['signup'])
     first_names = config.FIRST_NAMES
     surnames = config.LAST_NAMES
+    shuffle(first_names)
+    shuffle(surnames)
     assert len(first_names) > config.USER_SIGNUP
     assert len(surnames) > config.USER_SIGNUP
     names = [x + " " + y for x, y in zip(first_names[:config.USER_SIGNUP], surnames[:config.USER_SIGNUP])]

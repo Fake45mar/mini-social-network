@@ -8,6 +8,7 @@ class GetRequest(AbstractTestApi):
 
     def right_event(self, data):
         request = r.get(self._url, data=data)
+        print(request.json())
         assert 'encoded_user_data' in request.json()['data'].keys()
         return request.json()
 
