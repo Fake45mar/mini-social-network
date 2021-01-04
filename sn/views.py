@@ -18,7 +18,8 @@ def index(request):
             return o.isoformat()
 
     list_posts = list(models.Post.objects.all().values())
-    return HttpResponse(json.dumps({'data': {'posts': list(list_posts)}}, sort_keys=True, indent=1, default=default))
+    return HttpResponse(json.dumps({'data': {'posts': list(list_posts)},
+                                    'code': 200}, sort_keys=True, indent=1, default=default))
 
 
 @csrf_exempt
@@ -33,7 +34,7 @@ def signup(request):
                                     user_mail=title_body_dict['email'],
                                     user_company=title_body_dict['company'],
                                     user_password=title_body_dict['password'])
-            return HttpResponse(json.dumps({'data': {'error': 'User has already been registered'}}))
+            return HttpResponse(json.dumps({'data': {'error': 'User has already been registered'}, 'code': 200}))
         except ObjectDoesNotExist:
             pass
         hunter_io_verifier_json, clearbit_json = asyncio.run(functions.process_api_request(title_body_dict))
@@ -45,23 +46,24 @@ def signup(request):
                                    user_clearbit_com=str(clearbit_json),
                                    user_online=True)
         user = models.User.objects.get(user_name=title_body_dict['name'],
-                                            user_mail=title_body_dict['email'],
-                                            user_company=title_body_dict['company'],
-                                            user_password=title_body_dict['password'],
-                                            user_hunter_io=str(hunter_io_verifier_json),
-                                            user_clearbit_com=str(clearbit_json),
-                                            user_online=True)
+                                       user_mail=title_body_dict['email'],
+                                       user_company=title_body_dict['company'],
+                                       user_password=title_body_dict['password'],
+                                       user_hunter_io=str(hunter_io_verifier_json),
+                                       user_clearbit_com=str(clearbit_json),
+                                       user_online=True)
         private_key = open(config.PRIVATE_KEY_RS_256, 'rb').read()
         encoded_user_data = jwt.encode({'id': user.id, 'user_online': user.user_online}, private_key,
                                        algorithm='RS256')
-        return HttpResponse(json.dumps({'data': {'encoded_user_data': encoded_user_data}}))  # Does it return right key?
+        return HttpResponse(json.dumps({'data': {'encoded_user_data': encoded_user_data},
+                                        'code': 201}))
     except AssertionError:
-        return HttpResponse(json.dumps({'data': {'error': 'Either mail, or some request data is wrong'}}))
+        return HttpResponse(json.dumps({'data': {'error': 'Either mail, or some request data is wrong'}, 'code': 400}))
     except ObjectDoesNotExist:
         return HttpResponse(json.dumps({'data': {'error': 'Either mail, or some request data is wrong or some '
-                                                          'characters is not valid in your mail, name'}}))
+                                                          'characters is not valid in your mail, name'}, 'code': 400}))
     except MultipleObjectsReturned:
-        return HttpResponse(json.dumps({'data': {'error': 'User with these data exists'}}))
+        return HttpResponse(json.dumps({'data': {'error': 'User with these data exists'}, 'code': 200}))
 
 
 @csrf_exempt
@@ -80,12 +82,12 @@ def login(request):
         encoded_user_data = jwt.encode({'id': user.id, 'user_online': user.user_online},
                                        private_key, algorithm='RS256')
         return HttpResponse(json.dumps({'data': {'encoded_user_data': encoded_user_data,
-                                                 'user': {'email': user.user_mail}, 'action': 'login'}}))
+                                                 'user': {'email': user.user_mail}, 'action': 'login'}, 'code': 200}))
     except AssertionError:
-        return HttpResponse(json.dumps({'data': {'error': 'User has already been authorized'}}))
+        return HttpResponse(json.dumps({'data': {'error': 'User has already been authorized'}, 'code': 200}))
     except ObjectDoesNotExist:
         return HttpResponse(
-            json.dumps({'data': {'error': 'User hasn\'t been found'}}))
+            json.dumps({'data': {'error': 'User hasn\'t been found'}, 'code': 404}))
 
 
 @csrf_exempt
@@ -104,7 +106,7 @@ def create_post(request):
             models.Post.objects.get(post_user_id=decoded_user_data['id'],
                                     post_title=title_body_dict['title'],
                                     post_text=title_body_dict['text'])
-            return HttpResponse(json.dumps({'data': {'error': 'This post is already exists'}}))
+            return HttpResponse(json.dumps({'data': {'error': 'This post is already exists'}, 'code': 200}))
         except ObjectDoesNotExist:
             pass
         models.Post.objects.create(post_likes=0,
@@ -113,9 +115,9 @@ def create_post(request):
                                    post_text=title_body_dict['text'],
                                    post_date=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         return HttpResponse(json.dumps({'data': {'encoded_user_data': title_body_dict['encoded_user_data'],
-                                                 'post': title_body_dict['title'], 'success': True}}))
+                                                 'post': title_body_dict['title'], 'success': True}, 'code': 201}))
     except AssertionError:
-        return HttpResponse(json.dumps({'data': {'error': 'Please, pay attention to post details'}}))
+        return HttpResponse(json.dumps({'data': {'error': 'Please, pay attention to post details'}, 'code': 400}))
 
 
 @csrf_exempt
@@ -135,7 +137,7 @@ def like(request):
                                          liked_post_user_id=decoded_user_data['id'])
             return HttpResponse(json.dumps({'data': {'error': 'It seems, that is post that you want to '
                                                               'like has already been liked by you',
-                                                     'success': False}}))
+                                                     'success': False}, 'code': 403}))
         except ObjectDoesNotExist:
             pass
         post = models.Post.objects.get(id=post.id)
@@ -143,15 +145,16 @@ def like(request):
         post.save()
         models.LikedPost.objects.create(liked_post_post_id=post.id, liked_post_user_id=decoded_user_data['id'])
         return HttpResponse(json.dumps({'data': {'encoded_user_data': title_body_dict['encoded_user_data'],
-                                                 'post': post.post_title, 'action': 'like', 'success': True}}))
+                                                 'post': post.post_title, 'action': 'like', 'success': True},
+                                        'code': 200}))
     except AssertionError:
         return HttpResponse(json.dumps({'data': {'error': 'It seems, that is your post, '
                                                           'you can\'t add like to your own post',
-                                                 'success': False}}))
+                                                 'success': False}, 'code': 403}))
     except ObjectDoesNotExist:
         return HttpResponse(json.dumps({'data': {'error': 'It seems, that is post that you want to '
                                                           'like does not exist, please, try it again',
-                                                 'success': False}}))
+                                                 'success': False}, 'code': 404}))
 
 
 @csrf_exempt
@@ -171,7 +174,7 @@ def dislike(request):
                                             disliked_post_user_id=decoded_user_data['id'])
             return HttpResponse(json.dumps({'data': {'error': 'It seems, that is post that you want to '
                                                               'like has already been disliked by you',
-                                                     'success': False}}))
+                                                     'success': False}, 'code': 403}))
         except ObjectDoesNotExist:
             pass
         post.post_likes = post.post_likes - 1
@@ -179,15 +182,16 @@ def dislike(request):
         models.DisLikedPost.objects.create(disliked_post_post_id=post.id,
                                            disliked_post_user_id=decoded_user_data['id']).delete()
         return HttpResponse(json.dumps({'data': {'encoded_user_data': title_body_dict['encoded_user_data'],
-                                                 'post': post.post_title, 'action': 'dislike', 'success': True}}))
+                                                 'post': post.post_title, 'action': 'dislike', 'success': True},
+                                        'code': 200}))
     except AssertionError:
         return HttpResponse(json.dumps({'data': {'error': 'It seems, that is your post, '
                                                           'you can\'t add dislike to your own post',
-                                                 'success': False}}))
+                                                 'success': False}, 'code': 403}))
     except ObjectDoesNotExist:
         return HttpResponse(json.dumps({'data': {'error': 'It seems, that is post that you want to '
                                                           'dislike does not exist, please, try it again',
-                                                 'success': False}}))
+                                                 'success': False}, 'code': 404}))
 
 
 @csrf_exempt
@@ -204,9 +208,9 @@ def logout(request):
         user.save()
         return HttpResponse(json.dumps({'data': {'encoded_user_data': title_body_dict['encoded_user_data'],
                                                  'user': {'email': user.user_mail}, 'action': 'logout',
-                                                 'success': True}}))
+                                                 'success': True}, 'code': 200}))
     except AssertionError:
-        return HttpResponse(json.dumps({'data': {'error': 'User has already been unauthorized'}}))
+        return HttpResponse(json.dumps({'data': {'error': 'User has already been unauthorized'}, 'code': 200}))
     except ObjectDoesNotExist:
         return HttpResponse(
-            json.dumps({'data': {'error': 'User hasn\'t been found'}}))
+            json.dumps({'data': {'error': 'User hasn\'t been found'}, 'code': 404}))
